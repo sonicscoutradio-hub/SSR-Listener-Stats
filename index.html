@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sonic Scout Radio — Listener Stats</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0d0d0f;color:#f0ede8;font-family:Arial,sans-serif;min-height:100vh;}
+header{background:#111114;border-bottom:2px solid #e8700a;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.hlogo{font-size:1.1rem;font-weight:700;color:#f0ede8;}
+.hsub{font-size:11px;color:#c0c0c0;letter-spacing:.1em;text-transform:uppercase;margin-top:2px;}
+.hdate{font-size:11px;color:#e8700a;border:1px solid rgba(232,112,10,.3);padding:4px 12px;border-radius:3px;}
+.controls{padding:14px 28px;background:#0d0d0f;display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-bottom:1px solid #1a1a1e;}
+.search-wrap{position:relative;flex:1;min-width:200px;max-width:340px;}
+.search-wrap input{width:100%;background:#111114;border:1px solid #2a2a2e;color:#f0ede8;padding:8px 14px 8px 32px;font-size:13px;border-radius:3px;outline:none;font-family:Arial,sans-serif;}
+.search-wrap input:focus{border-color:#e8700a;}
+.search-wrap input::placeholder{color:#888;}
+.si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#b0b0b0;font-size:12px;}
+select{background:#111114;border:1px solid #2a2a2e;color:#f0ede8;padding:8px 12px;font-size:12px;border-radius:3px;outline:none;cursor:pointer;font-family:Arial,sans-serif;}
+.count{font-size:11px;color:#c0c0c0;margin-left:auto;}
+.count span{color:#f0ede8;}
+.wrap{padding:24px 28px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));gap:20px;}
+.card{background:#111114;border:1px solid #1e1e22;border-top:2px solid #e8700a;border-radius:4px;overflow:hidden;}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #1a1a1e;}
+.ch-left{display:flex;align-items:center;gap:12px;}
+.rank{font-size:11px;font-weight:700;color:#e8700a;background:rgba(232,112,10,.12);padding:3px 9px;border-radius:3px;letter-spacing:.1em;}
+.show-name{font-size:1rem;font-weight:700;color:#f0ede8;}
+.presenter-name{font-size:11px;color:#c0c0c0;margin-top:2px;}
+.streams{text-align:right;}
+.streams-val{font-size:1.4rem;font-weight:700;color:#f0ede8;}
+.streams-label{font-size:10px;color:#c0c0c0;letter-spacing:.1em;text-transform:uppercase;}
+.card-body{padding:16px 20px;}
+.meta-row{display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap;}
+.meta-item{display:flex;flex-direction:column;gap:2px;}
+.meta-label{font-size:10px;color:#c0c0c0;letter-spacing:.12em;text-transform:uppercase;}
+.meta-val{font-size:13px;color:#f0ede8;font-weight:600;}
+.meta-val.uid{font-family:'Courier New',monospace;font-size:11px;color:#c0c0c0;}
+.regions-title{font-size:10px;color:#e8700a;letter-spacing:.15em;text-transform:uppercase;font-weight:700;margin-bottom:10px;}
+.region-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;}
+.region-name{font-size:12px;color:#c0c0c0;min-width:110px;}
+.region-bar-wrap{flex:1;height:6px;background:#1e1e22;border-radius:4px;overflow:hidden;}
+.region-bar{height:100%;border-radius:4px;transition:width .6s ease;}
+.region-pct{font-size:12px;font-weight:700;color:#f0ede8;min-width:38px;text-align:right;}
+.no-results{text-align:center;padding:60px 20px;color:#555;font-size:14px;}
+@media(max-width:600px){.grid{grid-template-columns:1fr;}.wrap{padding:16px;}.controls{padding:12px;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="hlogo">Sonic Scout Radio</div>
+    <div class="hsub">Listener Statistics</div>
+  </div>
+  <div class="hdate">03/30/2026 – 04/05/2026</div>
+</header>
+
+<div class="controls">
+  <div class="search-wrap">
+    <span class="si">&#128269;</span>
+    <input type="text" id="searchInput" placeholder="Search show or presenter..." oninput="render()">
+  </div>
+  <select id="sortSel" onchange="render()">
+    <option value="streams_desc">Streams: High to Low</option>
+    <option value="streams_asc">Streams: Low to High</option>
+    <option value="name_asc">Show Name A–Z</option>
+    <option value="retention_desc">Retention: High to Low</option>
+  </select>
+  <div class="count">Showing <span id="showCount">0</span> of <span id="totalCount">0</span> shows</div>
+</div>
+
+<div class="wrap">
+  <div class="grid" id="grid"></div>
+  <div class="no-results" id="noResults" style="display:none;">No shows found matching your search.</div>
+</div>
+
+<script>
+var data = [
+  {
+    uid:'U08UMH2R16K', presenter:'blckjcksn', show:'Audio Underground',
+    streams:5447, retention:'51:24', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:34,color:'#e8700a'},
+      {name:'Canada',pct:8,color:'#4ea8de'},
+      {name:'Europe',pct:29,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:18,color:'#a78bfa'},
+      {name:'Australasia',pct:11,color:'#f472b6'}
+    ]
+  },
+  {
+    uid:'U0188FGLMM', presenter:'docz', show:"Doc Z's Melodies",
+    streams:3899, retention:'47:38', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:41,color:'#e8700a'},
+      {name:'Canada',pct:6,color:'#4ea8de'},
+      {name:'Europe',pct:24,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:21,color:'#a78bfa'},
+      {name:'Australasia',pct:8,color:'#f472b6'}
+    ]
+  },
+  {
+    uid:'U355GHKTBS', presenter:'Maimuxic', show:'Uptown Sounds (Maimuxic)',
+    streams:3440, retention:'55:09', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:52,color:'#e8700a'},
+      {name:'Canada',pct:11,color:'#4ea8de'},
+      {name:'Europe',pct:17,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:12,color:'#a78bfa'},
+      {name:'Australasia',pct:8,color:'#f472b6'}
+    ]
+  },
+  {
+    uid:'U3768JB33YHS', presenter:'Maimuxic', show:'The Backline',
+    streams:2899, retention:'44:52', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:38,color:'#e8700a'},
+      {name:'Canada',pct:9,color:'#4ea8de'},
+      {name:'Europe',pct:31,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:14,color:'#a78bfa'},
+      {name:'Australasia',pct:8,color:'#f472b6'}
+    ]
+  },
+  {
+    uid:'U08VDAKV1M0', presenter:'Master of Mischief', show:'Outcast Frequency',
+    streams:7004, retention:'58:17', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:29,color:'#e8700a'},
+      {name:'Canada',pct:7,color:'#4ea8de'},
+      {name:'Europe',pct:36,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:22,color:'#a78bfa'},
+      {name:'Australasia',pct:6,color:'#f472b6'}
+    ]
+  },
+  {
+    uid:'U0976L5MZQU', presenter:'Noah', show:'Hello World',
+    streams:7664, retention:'56:43', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:45,color:'#e8700a'},
+      {name:'Canada',pct:10,color:'#4ea8de'},
+      {name:'Europe',pct:22,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:16,color:'#a78bfa'},
+      {name:'Australasia',pct:7,color:'#f472b6'}
+    ]
+  },
+  {
+    uid:'DF6499HUEEV', presenter:'Bill Lowther', show:'The Broken Amp',
+    streams:5411, retention:'49:05', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:27,color:'#e8700a'},
+      {name:'Canada',pct:5,color:'#4ea8de'},
+      {name:'Europe',pct:42,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:19,color:'#a78bfa'},
+      {name:'Australasia',pct:7,color:'#f472b6'}
+    ]
+  },
+  {
+    uid:'HN5497668JK', presenter:'Don Wayne', show:'Downtime',
+    streams:4884, retention:'53:31', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:48,color:'#e8700a'},
+      {name:'Canada',pct:12,color:'#4ea8de'},
+      {name:'Europe',pct:21,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:11,color:'#a78bfa'},
+      {name:'Australasia',pct:8,color:'#f472b6'}
+    ]
+  },
+  {
+    uid:'HN5497668JK', presenter:'Raw & Uncharted', show:'Raw & Uncharted',
+    streams:2554, retention:'46:17', date:'03/30/2026-04/05/2026',
+    regions:[
+      {name:'USA',pct:55,color:'#e8700a'},
+      {name:'Canada',pct:13,color:'#4ea8de'},
+      {name:'Europe',pct:18,color:'#3ecf8e'},
+      {name:'Asia/Far East',pct:9,color:'#a78bfa'},
+      {name:'Australasia',pct:5,color:'#f472b6'}
+    ]
+  }
+];
+
+// Sort by streams desc by default
+data.sort(function(a,b){return b.streams-a.streams;});
+// Assign ranks after sort
+data.forEach(function(d,i){d.rank=i+1;});
+
+document.getElementById('totalCount').textContent=data.length;
+
+function retentionHours(s){
+  var m=s.match(/(\d+):(\d+)/);
+  if(!m)return 0;
+  return parseInt(m[1])*60+parseInt(m[2]);
+}
+
+function render(){
+  var q=document.getElementById('searchInput').value.toLowerCase();
+  var sort=document.getElementById('sortSel').value;
+
+  var filtered=data.filter(function(d){
+    return !q||(d.show||'').toLowerCase().includes(q)||(d.presenter||'').toLowerCase().includes(q);
+  });
+
+  filtered.sort(function(a,b){
+    if(sort==='streams_desc')return b.streams-a.streams;
+    if(sort==='streams_asc')return a.streams-b.streams;
+    if(sort==='name_asc')return a.show.localeCompare(b.show);
+    if(sort==='retention_desc')return retentionHours(b.retention)-retentionHours(a.retention);
+    return 0;
+  });
+
+  document.getElementById('showCount').textContent=filtered.length;
+  var grid=document.getElementById('grid');
+  var noRes=document.getElementById('noResults');
+
+  if(!filtered.length){
+    grid.innerHTML='';
+    noRes.style.display='block';
+    return;
+  }
+  noRes.style.display='none';
+
+  grid.innerHTML=filtered.map(function(d){
+    var regionBars=d.regions.map(function(r){
+      return '<div class="region-row">'
+        +'<div class="region-name">'+r.name+'</div>'
+        +'<div class="region-bar-wrap"><div class="region-bar" style="width:'+r.pct+'%;background:'+r.color+';"></div></div>'
+        +'<div class="region-pct">'+r.pct+'%</div>'
+        +'</div>';
+    }).join('');
+
+    return '<div class="card">'
+      +'<div class="card-header">'
+        +'<div class="ch-left">'
+          +'<div class="rank">#'+d.rank+'</div>'
+          +'<div><div class="show-name">'+d.show+'</div><div class="presenter-name">'+d.presenter+'</div></div>'
+        +'</div>'
+        +'<div class="streams"><div class="streams-val">'+Number(d.streams).toLocaleString()+'</div><div class="streams-label">Streams</div></div>'
+      +'</div>'
+      +'<div class="card-body">'
+        +'<div class="meta-row">'
+          +'<div class="meta-item"><div class="meta-label">User ID</div><div class="meta-val uid">'+d.uid+'</div></div>'
+          +'<div class="meta-item"><div class="meta-label">Avg Retention (7 Days)</div><div class="meta-val">'+d.retention+'</div></div>'
+          +'<div class="meta-item"><div class="meta-label">Period</div><div class="meta-val">'+d.date+'</div></div>'
+        +'</div>'
+        +'<div class="regions-title">Listener Regions</div>'
+        +regionBars
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+render();
+</script>
+</body>
+</html>
